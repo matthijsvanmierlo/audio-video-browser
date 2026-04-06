@@ -194,6 +194,30 @@
     </div>
   </div>
 
+  <!-- Save File Modal -->
+  <div id="modal-save-filename" class="modal">
+    <div class="modal-background" onclick="closeModal('modal-save-filename')"></div>
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title">Save File As</p>
+        <button class="delete" aria-label="close" onclick="closeModal('modal-save-filename')"></button>
+      </header>
+      <section class="modal-card-body">
+        <div class="field">
+          <label class="label">File Name</label>
+          <div class="control">
+            <input class="input" type="text" id="export-filename-input" placeholder="e.g. my_recording">
+          </div>
+          <p class="help">The appropriate extension (.mp3 or .mp4) will be added automatically.</p>
+        </div>
+      </section>
+      <footer class="modal-card-foot">
+        <button class="button is-success" onclick="confirmExport()">Save</button>
+        <button class="button" onclick="closeModal('modal-save-filename')">Cancel</button>
+      </footer>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
   <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
   <script>
@@ -397,12 +421,29 @@
 
     // --- Export Logic ---
     let activeObjectURL = null;
+    let pendingExportFormat = null;
 
-    async function exportMedia(format) {
+    function exportMedia(format) {
       if (!audioBlob) return;
       if (!ffmpeg) {
         alert("FFmpeg is not initialized yet.");
         return;
+      }
+
+      pendingExportFormat = format;
+      const filenameInput = document.getElementById('export-filename-input');
+      filenameInput.value = 'recording';
+      openModal('modal-save-filename');
+    }
+
+    async function confirmExport() {
+      closeModal('modal-save-filename');
+      const format = pendingExportFormat;
+      if (!format) return;
+
+      let filenameBase = document.getElementById('export-filename-input').value.trim();
+      if (!filenameBase) {
+        filenameBase = 'recording';
       }
 
       const progressContainer = document.getElementById('export-progress-container');
@@ -430,12 +471,12 @@
         let outputFilename = '';
 
         if (format === 'mp3') {
-          outputFilename = 'output.mp3';
+          outputFilename = filenameBase + '.mp3';
           // Convert to MP3
           await ffmpeg.exec(['-i', 'input_audio.webm', '-vn', '-ar', '44100', '-ac', '2', '-b:a', '192k', outputFilename]);
         }
         else if (format === 'mp4') {
-          outputFilename = 'output.mp4';
+          outputFilename = filenameBase + '.mp4';
 
           // Get slide image from canvas
           const dataUrl = slideCanvas.toDataURL('image/png');
