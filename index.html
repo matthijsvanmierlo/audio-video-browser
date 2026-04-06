@@ -1,1 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Media Recorder</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <style>
+    /* Custom styles */
+    body {
+      display: flex;
+      min-height: 100vh;
+      flex-direction: column;
+      background-color: #f5f5f5;
+    }
+    .main-content {
+      flex: 1;
+      padding: 2rem 1rem;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.is-active {
+      display: block;
+    }
+    .slide-preview {
+      width: 100%;
+      max-width: 640px;
+      height: 360px;
+      border: 1px solid #ccc;
+      margin: 1rem auto;
+      background-color: #fff;
+      display: block;
+    }
+    .hidden {
+      display: none !important;
+    }
+    #loading-modal .modal-content {
+      text-align: center;
+      color: white;
+    }
+    #loading-modal .progress {
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
 
+  <!-- Loading Modal (Critical Requirement) -->
+  <div id="loading-modal" class="modal is-active">
+    <div class="modal-background"></div>
+    <div class="modal-content">
+      <h2 class="title has-text-white">Initializing Local Media Engine...</h2>
+      <progress class="progress is-large is-primary" max="100">Loading</progress>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <section class="hero is-primary">
+    <div class="hero-body has-text-centered">
+      <h1 class="title">Local Media Recorder</h1>
+      <p class="subtitle">100% Local, Zero-Footprint Audio & Slide Recorder</p>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <main class="main-content container is-max-desktop">
+    <div class="box">
+      <!-- Tabs -->
+      <div class="tabs is-centered is-boxed">
+        <ul>
+          <li class="is-active" id="tab-audio" onclick="switchTab('audio')">
+            <a>
+              <span>Quick Audio</span>
+            </a>
+          </li>
+          <li id="tab-slide" onclick="switchTab('slide')">
+            <a>
+              <span>Audio + Slide</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Tab Contents -->
+      <div id="content-audio" class="tab-content is-active">
+        <div class="content has-text-centered">
+          <p>Record a quick voice memo or audio clip.</p>
+        </div>
+      </div>
+
+      <div id="content-slide" class="tab-content">
+        <div class="content has-text-centered">
+          <p>Customize your slide background and text, then record your voiceover.</p>
+
+          <div class="field is-horizontal">
+            <div class="field-label is-normal">
+              <label class="label">Background Color</label>
+            </div>
+            <div class="field-body">
+              <div class="field">
+                <div class="control">
+                  <input class="input" type="color" id="slide-bg-color" value="#3273dc" style="padding: 0; width: 60px; height: 40px;">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label">Slide Text</label>
+            <div class="control">
+              <textarea class="textarea" id="slide-text" placeholder="Enter your slide text here...">My Presentation</textarea>
+            </div>
+          </div>
+
+          <canvas id="slide-canvas" class="slide-preview" width="1280" height="720"></canvas>
+        </div>
+      </div>
+
+      <!-- Recorder Controls -->
+      <hr>
+      <div class="has-text-centered">
+        <h3 class="title is-4" id="timer-display">00:00</h3>
+        <div class="buttons is-centered">
+          <button id="btn-record" class="button is-danger is-large" onclick="startRecording()">Record</button>
+          <button id="btn-stop" class="button is-dark is-large" onclick="stopRecording()" disabled>Stop</button>
+        </div>
+        <p id="recording-status" class="help is-danger hidden">Recording in progress...</p>
+      </div>
+
+      <!-- Export Area -->
+      <div id="export-area" class="mt-5 hidden">
+        <hr>
+        <h4 class="title is-5 has-text-centered">Export & Save</h4>
+        <div class="buttons is-centered">
+          <button id="btn-export-mp3" class="button is-info" onclick="exportMedia('mp3')">Export as MP3</button>
+          <button id="btn-export-mp4" class="button is-link" onclick="exportMedia('mp4')">Export as MP4 (with Slide)</button>
+        </div>
+        <div id="export-progress-container" class="hidden">
+          <p class="has-text-centered mb-2">Processing...</p>
+          <progress id="export-progress" class="progress is-info" value="0" max="100"></progress>
+        </div>
+        <div class="has-text-centered mt-4">
+          <button class="button is-warning is-light" onclick="resetApp()">Start Again</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer pb-6 pt-6">
+    <div class="content has-text-centered">
+      <p>
+        <strong>Local Media Recorder</strong> - Zero footprint, local-first processing.
+      </p>
+      <div class="buttons is-centered">
+        <button class="button is-text" onclick="openModal('modal-privacy')">Privacy Policy</button>
+        <button class="button is-text" onclick="openModal('modal-terms')">Terms of Use</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Privacy Policy Modal -->
+  <div id="modal-privacy" class="modal">
+    <div class="modal-background" onclick="closeModal('modal-privacy')"></div>
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title">Privacy Policy</p>
+        <button class="delete" aria-label="close" onclick="closeModal('modal-privacy')"></button>
+      </header>
+      <section class="modal-card-body">
+        <p>This tool runs entirely locally in your browser. No data, audio, or video is sent to any server. All files are wiped from memory once you close the page or hit Start Again.</p>
+      </section>
+      <footer class="modal-card-foot">
+        <button class="button is-success" onclick="closeModal('modal-privacy')">Understood</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Terms of Use Modal -->
+  <div id="modal-terms" class="modal">
+    <div class="modal-background" onclick="closeModal('modal-terms')"></div>
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title">Terms of Use</p>
+        <button class="delete" aria-label="close" onclick="closeModal('modal-terms')"></button>
+      </header>
+      <section class="modal-card-body">
+        <p>This tool runs entirely locally in your browser. No data, audio, or video is sent to any server. All files are wiped from memory once you close the page or hit Start Again.</p>
+      </section>
+      <footer class="modal-card-foot">
+        <button class="button is-success" onclick="closeModal('modal-terms')">Understood</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+  <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+  <script>
+    const { FFmpeg } = FFmpegWASM;
+    const { toBlobURL, fetchFile } = FFmpegUtil;
+    let ffmpeg = null;
+
+    // Initialize FFmpeg
+    async function initMediaEngine() {
+      try {
+        ffmpeg = new FFmpeg();
+
+        // Listen to load progress
+        ffmpeg.on('progress', ({ progress }) => {
+           // loading progress
+        });
+
+        // Load ffmpeg-core using ESM single-threaded build to avoid SharedArrayBuffer and module worker import errors
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+        const ffmpegURL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd';
+
+        await ffmpeg.load({
+            coreURL: baseURL + '/ffmpeg-core.js',
+            wasmURL: baseURL + '/ffmpeg-core.wasm',
+            classWorkerURL: await toBlobURL(ffmpegURL + '/814.ffmpeg.js', 'text/javascript')
+        });
+
+        // Hide loading modal when done
+        document.getElementById('loading-modal').classList.remove('is-active');
+      } catch (e) {
+        console.error("Error loading FFmpeg:", e.message, e);
+        document.querySelector('#loading-modal .title').innerText = "Error Loading Media Engine: " + (e.message || String(e));
+        document.querySelector('#loading-modal .progress').classList.remove('is-primary');
+        document.querySelector('#loading-modal .progress').classList.add('is-danger');
+      }
+    }
+
+    // --- Slide Canvas Logic ---
+    const slideCanvas = document.getElementById('slide-canvas');
+    const ctx = slideCanvas.getContext('2d');
+    const colorPicker = document.getElementById('slide-bg-color');
+    const slideTextInput = document.getElementById('slide-text');
+
+    function drawSlide() {
+      // Background
+      ctx.fillStyle = colorPicker.value;
+      ctx.fillRect(0, 0, slideCanvas.width, slideCanvas.height);
+
+      // Text
+      ctx.fillStyle = getContrastYIQ(colorPicker.value);
+      ctx.font = 'bold 60px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Handle simple text wrapping (rough estimation for standard text)
+      const text = slideTextInput.value;
+      const maxWidth = slideCanvas.width - 100;
+      const words = text.split(' ');
+      let line = '';
+      let y = slideCanvas.height / 2;
+      const lineHeight = 70;
+
+      // Estimate vertical start to center multiple lines
+      let lines = [];
+      for (let n = 0; n < words.length; n++) {
+        let testLine = line + words[n] + ' ';
+        let metrics = ctx.measureText(testLine);
+        let testWidth = metrics.width;
+        if (testWidth > maxWidth && n > 0) {
+          lines.push(line);
+          line = words[n] + ' ';
+        } else {
+          line = testLine;
+        }
+      }
+      lines.push(line);
+
+      let startY = y - ((lines.length - 1) * lineHeight) / 2;
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], slideCanvas.width / 2, startY + (i * lineHeight));
+      }
+    }
+
+    // Helper to determine text color based on background
+    function getContrastYIQ(hexcolor){
+        hexcolor = hexcolor.replace("#", "");
+        if (hexcolor.length === 3) {
+            hexcolor = hexcolor[0]+hexcolor[0]+hexcolor[1]+hexcolor[1]+hexcolor[2]+hexcolor[2];
+        }
+        var r = parseInt(hexcolor.substr(0,2),16);
+        var g = parseInt(hexcolor.substr(2,2),16);
+        var b = parseInt(hexcolor.substr(4,2),16);
+        var yiq = ((r*299)+(g*587)+(b*114))/1000;
+        return (yiq >= 128) ? 'black' : 'white';
+    }
+
+    colorPicker.addEventListener('input', drawSlide);
+    slideTextInput.addEventListener('input', drawSlide);
+
+    // Call init on page load
+    window.addEventListener('load', () => {
+      initMediaEngine();
+      drawSlide(); // initial draw
+    });
+
+    // Tab switching logic
+    function switchTab(tabName) {
+      document.getElementById('tab-audio').classList.remove('is-active');
+      document.getElementById('tab-slide').classList.remove('is-active');
+      document.getElementById('content-audio').classList.remove('is-active');
+      document.getElementById('content-slide').classList.remove('is-active');
+
+      document.getElementById('tab-' + tabName).classList.add('is-active');
+      document.getElementById('content-' + tabName).classList.add('is-active');
+    }
+
+    // Modal logic
+    function openModal(id) {
+      document.getElementById(id).classList.add('is-active');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('is-active');
+    }
+
+    // --- Recording Logic ---
+    let mediaRecorder;
+    let audioChunks = [];
+    let audioBlob = null;
+    let recordingTimer;
+    let recordingSeconds = 0;
+
+    async function startRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = event => {
+          if (event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+
+          // Stop all audio tracks to release the microphone
+          stream.getTracks().forEach(track => track.stop());
+
+          // Update UI
+          document.getElementById('recording-status').classList.add('hidden');
+          document.getElementById('btn-record').disabled = false;
+          document.getElementById('btn-stop').disabled = true;
+
+          // Show export area
+          document.getElementById('export-area').classList.remove('hidden');
+
+          // Enable/disable export options based on the active tab
+          const isSlideTab = document.getElementById('tab-slide').classList.contains('is-active');
+          if (isSlideTab) {
+            document.getElementById('btn-export-mp4').classList.remove('hidden');
+          } else {
+            document.getElementById('btn-export-mp4').classList.add('hidden');
+          }
+        };
+
+        // Update UI for recording
+        document.getElementById('btn-record').disabled = true;
+        document.getElementById('btn-stop').disabled = false;
+        document.getElementById('recording-status').classList.remove('hidden');
+        document.getElementById('export-area').classList.add('hidden');
+
+        // Timer
+        recordingSeconds = 0;
+        updateTimerDisplay();
+        recordingTimer = setInterval(() => {
+          recordingSeconds++;
+          updateTimerDisplay();
+        }, 1000);
+
+        mediaRecorder.start();
+      } catch (err) {
+        console.error("Microphone access denied or error", err);
+        alert("Unable to access the microphone. Please ensure permissions are granted.");
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        clearInterval(recordingTimer);
+      }
+    }
+
+    function updateTimerDisplay() {
+      const minutes = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
+      const seconds = String(recordingSeconds % 60).padStart(2, '0');
+      document.getElementById('timer-display').innerText = `${minutes}:${seconds}`;
+    }
+
+    // --- Export Logic ---
+    let activeObjectURL = null;
+
+    async function exportMedia(format) {
+      if (!audioBlob) return;
+      if (!ffmpeg) {
+        alert("FFmpeg is not initialized yet.");
+        return;
+      }
+
+      const progressContainer = document.getElementById('export-progress-container');
+      const progressBar = document.getElementById('export-progress');
+      progressContainer.classList.remove('hidden');
+      progressBar.value = 0;
+
+      // Ensure buttons are disabled during processing
+      const btnMp3 = document.getElementById('btn-export-mp3');
+      const btnMp4 = document.getElementById('btn-export-mp4');
+      btnMp3.disabled = true;
+      btnMp4.disabled = true;
+
+      ffmpeg.on('progress', ({ progress, time }) => {
+        // Progress can be > 1 or very small, normalize to 0-100
+        progressBar.value = Math.max(0, Math.min(100, progress * 100));
+      });
+
+      try {
+        const audioBuffer = await audioBlob.arrayBuffer();
+        const audioUint8 = new Uint8Array(audioBuffer);
+
+        await ffmpeg.writeFile('input_audio.webm', audioUint8);
+
+        let outputFilename = '';
+
+        if (format === 'mp3') {
+          outputFilename = 'output.mp3';
+          // Convert to MP3
+          await ffmpeg.exec(['-i', 'input_audio.webm', '-vn', '-ar', '44100', '-ac', '2', '-b:a', '192k', outputFilename]);
+        }
+        else if (format === 'mp4') {
+          outputFilename = 'output.mp4';
+
+          // Get slide image from canvas
+          const dataUrl = slideCanvas.toDataURL('image/png');
+          const res = await fetch(dataUrl);
+          const imgBlob = await res.blob();
+          const imgBuffer = await imgBlob.arrayBuffer();
+          await ffmpeg.writeFile('slide.png', new Uint8Array(imgBuffer));
+
+          // Combine image and audio into MP4
+          // -loop 1 to loop the single image, -shortest to stop when audio ends
+          await ffmpeg.exec([
+            '-loop', '1',
+            '-i', 'slide.png',
+            '-i', 'input_audio.webm',
+            '-c:v', 'libx264',
+            '-tune', 'stillimage',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-pix_fmt', 'yuv420p',
+            '-shortest',
+            outputFilename
+          ]);
+        }
+
+        // Read result
+        const data = await ffmpeg.readFile(outputFilename);
+        const mimeType = format === 'mp3' ? 'audio/mp3' : 'video/mp4';
+        const finalBlob = new Blob([data.buffer], { type: mimeType });
+
+        // Clean up ffmpeg FS to free memory
+        try { await ffmpeg.deleteFile('input_audio.webm'); } catch(e){}
+        if(format === 'mp4') {
+          try { await ffmpeg.deleteFile('slide.png'); } catch(e){}
+        }
+        try { await ffmpeg.deleteFile(outputFilename); } catch(e){}
+
+        // Trigger download
+        if (activeObjectURL) URL.revokeObjectURL(activeObjectURL);
+        activeObjectURL = URL.createObjectURL(finalBlob);
+
+        const a = document.createElement('a');
+        a.href = activeObjectURL;
+        a.download = outputFilename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        progressBar.value = 100;
+        setTimeout(() => {
+          progressContainer.classList.add('hidden');
+          progressBar.value = 0;
+        }, 2000);
+
+      } catch (err) {
+        console.error("Export Error:", err);
+        alert("An error occurred during export. Check console for details.");
+        progressContainer.classList.add('hidden');
+      } finally {
+        btnMp3.disabled = false;
+        btnMp4.disabled = false;
+      }
+    }
+
+    // --- Reset Logic ---
+    function resetApp() {
+      // Clear data
+      audioChunks = [];
+      audioBlob = null;
+      if (activeObjectURL) {
+        URL.revokeObjectURL(activeObjectURL);
+        activeObjectURL = null;
+      }
+
+      // Reset UI elements
+      document.getElementById('export-area').classList.add('hidden');
+      document.getElementById('recording-status').classList.add('hidden');
+      document.getElementById('btn-record').disabled = false;
+      document.getElementById('btn-stop').disabled = true;
+
+      // Reset timer
+      recordingSeconds = 0;
+      updateTimerDisplay();
+      clearInterval(recordingTimer);
+
+      // Reset slide customizer
+      colorPicker.value = "#3273dc";
+      slideTextInput.value = "My Presentation";
+      drawSlide();
+
+      // Switch back to Audio tab by default
+      switchTab('audio');
+    }
+  </script>
+</body>
+</html>
